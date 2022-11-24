@@ -1,19 +1,3 @@
-#!/bin/bash
-# Script use to install LEMP stack on Debian 
-#--------------------------------------------------
-# Software version:
-# 1. OS: 10.3 (Buster) 64 bit
-# 2. Nginx: 1.14.2
-# 3. MariaDB: 10.3
-# 4. PHP 7: 7.3.3-1+0~20190307202245.32+stretch~1.gbp32ebb2
-#--------------------------------------------------
-# List function:
-# 1. checkroot: check to make sure script can be run by user root
-# 2. update: update all the packages
-# 3. install: funtion to install LEMP stack
-# 4. init: function use to call the main part of installation
-# 5. main: the main function, add your functions to this place
-
 # Function check user root
 checkroot() {
     if (($EUID == 0)); then
@@ -54,18 +38,34 @@ install() {
     echo "Installing MYSQL-SERVER..."
     echo ""
     sleep 1
-        apt install mysql-server -y
-        systemctl enable mysql && systemctl restart mysql
+    apt install mysql-server -y
+    systemctl enable mysql && systemctl restart mysql
     echo ""
     sleep 1
 
     echo "CREATING DB and USER ..."
-    echo ""
-        mysql -uroot -proot -e "ALTER USER 'root'@'localhoat' IDENTIFIED BY 'password'; "
-        mysql -uroot -proot -e "CREATE DATABASE wordpress_db /*\!40100 DEFAULT CHARACTER SET utf8 */;"
-        mysql -uroot -proot -e "CREATE USER 'wp_user'@'localhost' IDENTIFIED BY 'password';"
-        mysql -uroot -proot -e "GRANT ALL PRIVILEGES ON wordpress_db.* TO 'wpuser'@'localhost';"
-        mysql -uroot -proot -e "FLUSH PRIVILEGES;"
+    echo "Enter wordpress database name!"
+	read dbname
+    
+	echo "Creating new WordPress database..."
+	mysql -e "CREATE DATABASE ${dbname} /*\!40100 DEFAULT CHARACTER SET utf8 */;"
+	echo "Database successfully created!"
+	
+	echo "Enter wordpress database user!"
+	read username
+    
+	echo "Enter the PASSWORD for wordpress database user!"
+	echo "Note: password will be hidden when typing"
+	read -s userpass
+    
+	echo "Creating new user..."
+	mysql -e "CREATE USER ${username}@localhost IDENTIFIED BY '${userpass}';"
+	echo "User successfully created!"
+
+	echo "Granting ALL privileges on ${dbname} to ${username}!"
+	mysql -e "GRANT ALL PRIVILEGES ON ${dbname}.* TO '${username}'@'localhost';"
+	mysql -e "FLUSH PRIVILEGES;"
+	echo "You're good now :)"
     echo ""
     sleep 1
 
@@ -79,8 +79,7 @@ install() {
         apt install php7.3 php7.3-cli php7.3-common php7.3-fpm php7.3-gd php7.3-mysql -y
     echo ""
     sleep 1
-
-    ########## MODIFY GLOBAL CONFIGS ##########
+   ########## MODIFY GLOBAL CONFIGS ##########
     echo "Modifying Global Configurations..."
     echo ""
     sleep 1
@@ -106,23 +105,25 @@ install() {
     sleep 1
 cat >/etc/nginx/sites-enabled/default <<"EOF"
 server {
-        listen 80 ;
-        listen [::]:80 ;
-        root /var/www/wordpress;
-        index index.php index.html index.htm index.nginx-debian.html;
-        #server_name_;
-             location / {
-                 try_files $uri $uri/ /index.php$is_args$args;
-        }
-
-        location ~ \.php$ {
-                include snippets/fastcgi-php.conf;
-                fastcgi_pass unix:/run/php/php7.4-fpm.sock;
-        
-        }
+    listen 80;
+    listen [::]:80;
+    root /var/www/wordpress;
+    index index.php index.html index.htm;
+    server_name _;
+    location / {
+        try_files $uri $uri/ /index.php?$args;
+    }
+    location ~ ^/wp-json/ {
+        # if permalinks not enabled
+        rewrite ^/wp-json/(.*?)$ /?rest_route=/$1 last;
+    }
+    location ~ \.php$ {
+        include         fastcgi_params;
+        fastcgi_pass    unix:/run/php/php7.3-fpm.sock;
+        fastcgi_param   SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        fastcgi_index   index.php;
+    }
 }
-
-
 EOF
     echo ""
     sleep 1
@@ -164,6 +165,7 @@ EOF
     sleep 1
 
 }
+
 
 # initialized the whole installation.
 init() {
