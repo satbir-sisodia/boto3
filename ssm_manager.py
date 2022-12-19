@@ -31,7 +31,7 @@ def lambda_handler(event, context):
             InstanceIds=[instanceid],
             DocumentName="AWS-RunShellScript",
             Parameters={
-                "commands": ["echo '<h1>Success! the webhost virtual host is working</h1>' > /var/www/html/index.html"]},)
+                "commands": ["echo '<h1>Success! the webhost virtual host is totally fine working</h1>' > /var/www/html/index.html"]},)
 
         # fetching command id for the output
         command_id = response["Command"]["CommandId"]
